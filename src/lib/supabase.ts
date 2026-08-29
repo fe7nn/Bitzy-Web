@@ -5,9 +5,19 @@ let cachedClient: SupabaseClient | null = null;
 let currentUrl: string = '';
 let currentKey: string = '';
 
+// Runtime configurable credentials (from UI or .env.local)
+let runtimeUrl: string = '';
+let runtimeKey: string = '';
+
+export function setRuntimeSupabaseConfig(url: string, key: string) {
+  runtimeUrl = url;
+  runtimeKey = key;
+  cachedClient = null; // reset cached client
+}
+
 export function getSupabaseClient(customUrl?: string, customKey?: string): SupabaseClient | null {
-  const url = customUrl || (typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_SUPABASE_URL : '') || '';
-  const key = customKey || (typeof process !== 'undefined' ? (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) : '') || '';
+  const url = customUrl || runtimeUrl || (typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_SUPABASE_URL : '') || '';
+  const key = customKey || runtimeKey || (typeof process !== 'undefined' ? (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) : '') || '';
 
   if (!url || !key) {
     return null;
@@ -44,7 +54,7 @@ export async function testSupabaseConnection(url: string, key: string): Promise<
       if (error.code === '42P01') {
         return {
           success: false,
-          message: 'Connected to Supabase project, but the `students` table does not exist yet. Please run the SQL schema below in your Supabase SQL Editor.',
+          message: 'Connected to Supabase project, but the `students` table does not exist yet. Please run the SQL schema in your Supabase SQL Editor.',
         };
       }
       return { success: false, message: `Supabase error: ${error.message}` };
@@ -89,7 +99,7 @@ CREATE INDEX IF NOT EXISTS idx_students_course_year ON public.students(course, y
 -- 3. Enable Row Level Security (RLS)
 ALTER TABLE public.students ENABLE ROW LEVEL SECURITY;
 
--- 4. Policies (Public read for verification & Admin full access)
+-- 4. Policies (Full access for anon and authenticated API calls)
 CREATE POLICY "Allow public read of verification status" 
     ON public.students FOR SELECT 
     USING (true);

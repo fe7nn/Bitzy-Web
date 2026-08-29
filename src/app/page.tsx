@@ -119,7 +119,6 @@ export default function HomePage() {
               onRefreshData={fetchData}
               adminUser={adminUser}
               onOpenBotSimulator={() => setIsBotSimulatorOpen(true)}
-              onSupabaseStatusChange={setSupabaseConnected}
             />
           ) : (
             <LandingPage

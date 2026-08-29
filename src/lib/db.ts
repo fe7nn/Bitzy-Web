@@ -139,14 +139,14 @@ function getMemoryStore(): Student[] {
 }
 
 export function formatStudentFullName(student: { first_name: string; last_name: string; middle_name?: string | null }): string {
-  const mInitial = student.middle_name && student.middle_name.trim().length > 0 
+  const mInitial = student.middle_name && student.middle_name.trim().length > 0
     ? ` ${student.middle_name.trim().charAt(0).toUpperCase()}.`
     : '';
   return `${student.last_name}, ${student.first_name}${mInitial}`;
 }
 
 export function formatNickname(student: { first_name: string; last_name: string; middle_name?: string | null }): string {
-  const mInitial = student.middle_name && student.middle_name.trim().length > 0 
+  const mInitial = student.middle_name && student.middle_name.trim().length > 0
     ? ` ${student.middle_name.trim().charAt(0).toUpperCase()}.`
     : '';
   return `${student.first_name}${mInitial} ${student.last_name}`;
@@ -163,8 +163,11 @@ export async function getAllStudents(): Promise<Student[]> {
       if (!error && data) {
         return data as Student[];
       }
+      if (error) {
+        console.error('[Supabase getAllStudents ERROR]', error.message);
+      }
     } catch (e) {
-      console.warn('Supabase fetch failed, falling back to local store:', e);
+      console.warn('[db] Supabase getAllStudents failed, using memory store:', e);
     }
   }
   return getMemoryStore();
@@ -184,7 +187,7 @@ export async function getStudentById(student_id: string): Promise<Student | null
         return data as Student;
       }
     } catch (e) {
-      console.warn('Supabase getById failed, falling back to local store:', e);
+      console.warn('[db] Supabase getStudentById failed:', e);
     }
   }
 
@@ -206,7 +209,7 @@ export async function findStudentByDiscordId(discord_id: string): Promise<Studen
         return data as Student;
       }
     } catch (e) {
-      console.warn('Supabase findByDiscordId failed:', e);
+      console.warn('[db] Supabase findByDiscordId failed:', e);
     }
   }
 
@@ -217,17 +220,16 @@ export async function findStudentByDiscordId(discord_id: string): Promise<Studen
 export async function upsertStudent(student: Student): Promise<Student> {
   const supabase = getSupabaseClient();
   if (supabase) {
-    try {
-      const { data, error } = await supabase
-        .from('students')
-        .upsert(student, { onConflict: 'student_id' })
-        .select()
-        .single();
-      if (!error && data) {
-        return data as Student;
-      }
-    } catch (e) {
-      console.warn('Supabase upsert failed, falling back to memory store:', e);
+    const { data, error } = await supabase
+      .from('students')
+      .upsert(student, { onConflict: 'student_id' })
+      .select()
+      .single();
+    if (!error && data) {
+      return data as Student;
+    }
+    if (error) {
+      console.error('[Supabase upsertStudent ERROR]', error.message);
     }
   }
 
@@ -250,7 +252,7 @@ export async function bulkUpsertStudents(newStudents: Partial<Student>[]): Promi
       last_name: String(s.last_name).trim(),
       first_name: String(s.first_name).trim(),
       middle_name: s.middle_name ? String(s.middle_name).trim() : null,
-      course: s.course ? String(s.course).trim().toUpperCase() : 'BSCPE',
+      course: s.course ? String(s.course).trim() : 'BSCpE',
       year_level: s.year_level ? String(s.year_level).trim() : '1st Year',
       is_verified: Boolean(s.is_verified || false),
       discord_id: s.discord_id ? String(s.discord_id).trim() : null,
@@ -258,20 +260,29 @@ export async function bulkUpsertStudents(newStudents: Partial<Student>[]): Promi
       verified_at: s.verified_at ? String(s.verified_at) : null,
     }));
 
-  const supabase = getSupabaseClient();
-  if (supabase && sanitized.length > 0) {
-    try {
-      const { error } = await supabase
-        .from('students')
-        .upsert(sanitized, { onConflict: 'student_id' });
-      if (!error) {
-        return { inserted: sanitized.length, updated: 0, total: sanitized.length };
-      }
-    } catch (e) {
-      console.warn('Supabase bulk upsert failed, saving to local store:', e);
-    }
+  if (sanitized.length === 0) {
+    return { inserted: 0, updated: 0, total: 0 };
   }
 
+  const supabase = getSupabaseClient();
+
+  if (supabase) {
+    const { error } = await supabase
+      .from('students')
+      .upsert(sanitized, { onConflict: 'student_id' });
+
+    if (error) {
+      console.error('[Supabase bulkUpsert ERROR]', JSON.stringify(error, null, 2));
+      // Throw so the API route returns the real error to the browser instead of silently succeeding
+      throw new Error(`Supabase upsert failed: ${error.message} (code: ${error.code})`);
+    }
+
+    console.log(`[Supabase] Successfully upserted ${sanitized.length} student records.`);
+    return { inserted: sanitized.length, updated: 0, total: sanitized.length };
+  }
+
+  // No Supabase client configured — write to memory fallback
+  console.warn('[db] No Supabase client found. Check that .env.local has NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY and restart the dev server.');
   const list = getMemoryStore();
   let inserted = 0;
   let updated = 0;
@@ -303,7 +314,7 @@ export async function deleteStudent(student_id: string): Promise<boolean> {
         return true;
       }
     } catch (e) {
-      console.warn('Supabase delete failed:', e);
+      console.warn('[db] Supabase delete failed:', e);
     }
   }
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Database, 
   Terminal, 
@@ -14,9 +14,10 @@ import {
   AlertCircle,
   ExternalLink,
   Sparkles,
-  Server
+  Server,
+  RefreshCw
 } from 'lucide-react';
-import { SUPABASE_SQL_SCHEMA, testSupabaseConnection } from '@/lib/supabase';
+import { SUPABASE_SQL_SCHEMA } from '@/lib/supabase';
 
 interface SettingsAndBotIntegrationProps {
   onSupabaseStatusChange?: (connected: boolean) => void;
@@ -129,18 +130,37 @@ export const SettingsAndBotIntegration: React.FC<SettingsAndBotIntegrationProps>
   const [copiedEndpoint, setCopiedEndpoint] = useState(false);
   const [copiedBotCode, setCopiedBotCode] = useState(false);
 
-  const handleTestConnection = async () => {
+  const handleTestAndSaveConnection = async () => {
+    if (!supabaseUrl.trim() || !supabaseKey.trim()) {
+      setSupabaseStatus({
+        tested: true,
+        success: false,
+        message: 'Please paste both your Supabase Project URL and Anon API Key.',
+      });
+      return;
+    }
+
     setIsTestingSupabase(true);
     setSupabaseStatus(null);
     try {
-      const result = await testSupabaseConnection(supabaseUrl.trim(), supabaseKey.trim());
+      const res = await fetch('/api/settings/supabase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: supabaseUrl.trim(),
+          key: supabaseKey.trim(),
+        }),
+      });
+
+      const data = await res.json();
       setSupabaseStatus({
         tested: true,
-        success: result.success,
-        message: result.message,
+        success: data.success,
+        message: data.message || (data.success ? 'Connected and saved to server!' : 'Connection failed'),
       });
+
       if (onSupabaseStatusChange) {
-        onSupabaseStatusChange(result.success);
+        onSupabaseStatusChange(data.success);
       }
     } catch (err: any) {
       setSupabaseStatus({
@@ -242,15 +262,24 @@ export const SettingsAndBotIntegration: React.FC<SettingsAndBotIntegrationProps>
 
         <div className="flex items-center justify-between pt-2">
           <div className="text-[11px] text-slate-400">
-            Tip: You can also specify credentials in <code className="text-blue-400">.env.local</code>.
+            Paste your Project URL & Key above and click <strong>Test & Save Connection</strong> to link the database.
           </div>
           <button
-            onClick={handleTestConnection}
+            onClick={handleTestAndSaveConnection}
             disabled={isTestingSupabase || !supabaseUrl || !supabaseKey}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-glow-blue transition disabled:opacity-50"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-glow-blue transition disabled:opacity-50"
           >
-            <Database className="w-3.5 h-3.5" />
-            <span>{isTestingSupabase ? 'Testing Connection...' : 'Test & Save Connection'}</span>
+            {isTestingSupabase ? (
+              <>
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                <span>Testing & Saving...</span>
+              </>
+            ) : (
+              <>
+                <Database className="w-3.5 h-3.5" />
+                <span>Test & Save Connection</span>
+              </>
+            )}
           </button>
         </div>
       </div>
