@@ -261,6 +261,20 @@ export async function bulkUpsertStudents(newStudents: Partial<Student>[]): Promi
     return COURSE_MAP[key] ?? 'BSCpE';
   }
 
+  const year_level_map: Record<string, string> = {
+    '1': '1st Year',
+    '2': '2nd Year',
+    '3': '3rd Year',
+    '4': '4th Year',
+    '5': '5th Year',
+  };
+
+  function normalizeYearLevel(raw?: string | null): string {
+    if (!raw) return '1st Year';
+    const key = String(raw).trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    return year_level_map[key] ?? '1st Year';
+  }
+
   const sanitized: Student[] = newStudents
     .filter(s => s.student_id && s.last_name && s.first_name)
     .map(s => ({
@@ -269,7 +283,7 @@ export async function bulkUpsertStudents(newStudents: Partial<Student>[]): Promi
       first_name: String(s.first_name).trim(),
       middle_name: s.middle_name ? String(s.middle_name).trim() : null,
       course: normalizeCourse(s.course ? String(s.course) : undefined),
-      year_level: s.year_level ? String(s.year_level).trim() : '1st Year',
+      year_level: normalizeYearLevel(s.year_level ? String(s.year_level) : undefined),
       is_verified: Boolean(s.is_verified || false),
       discord_id: s.discord_id ? String(s.discord_id).trim() : null,
       discord_tag: s.discord_tag ? String(s.discord_tag).trim() : null,
