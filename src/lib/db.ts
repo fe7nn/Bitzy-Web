@@ -245,6 +245,22 @@ export async function upsertStudent(student: Student): Promise<Student> {
 }
 
 export async function bulkUpsertStudents(newStudents: Partial<Student>[]): Promise<{ inserted: number; updated: number; total: number }> {
+  // Normalize course names to canonical values to satisfy DB check constraints
+  // Coerce all courses to the canonical BSCpE value. Accept common variants like BSCPE.
+  const COURSE_MAP: Record<string, string> = {
+    'bscpe': 'BSCpE',
+    'bsc p e': 'BSCpE',
+    'bscp e': 'BSCpE',
+    'bscpe.': 'BSCpE',
+    'bscp.e': 'BSCpE',
+  };
+
+  function normalizeCourse(raw?: string | null): string {
+    if (!raw) return 'BSCpE';
+    const key = String(raw).trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    return COURSE_MAP[key] ?? 'BSCpE';
+  }
+
   const sanitized: Student[] = newStudents
     .filter(s => s.student_id && s.last_name && s.first_name)
     .map(s => ({
@@ -252,7 +268,7 @@ export async function bulkUpsertStudents(newStudents: Partial<Student>[]): Promi
       last_name: String(s.last_name).trim(),
       first_name: String(s.first_name).trim(),
       middle_name: s.middle_name ? String(s.middle_name).trim() : null,
-      course: s.course ? String(s.course).trim() : 'BSCpE',
+      course: normalizeCourse(s.course ? String(s.course) : undefined),
       year_level: s.year_level ? String(s.year_level).trim() : '1st Year',
       is_verified: Boolean(s.is_verified || false),
       discord_id: s.discord_id ? String(s.discord_id).trim() : null,
