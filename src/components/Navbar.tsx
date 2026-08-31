@@ -18,6 +18,7 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
+  currentView,
   setCurrentView,
   adminUser,
   onLogout,
@@ -27,8 +28,9 @@ export const Navbar: React.FC<NavbarProps> = ({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         {/* Brand & Logo */}
         <div
-          onClick={() => setCurrentView('landing')}
-          className="flex items-center gap-3 cursor-pointer group select-none">
+          onClick={() => setCurrentView(adminUser ? 'admin' : 'landing')}
+          className="flex items-center gap-3 cursor-pointer group select-none"
+        >
           <img
             src={logo.src}
             alt="ICpEP.SE Logo"
@@ -51,6 +53,32 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Right Navigation & Controls */}
         <div className="flex items-center gap-3">
+          {/* Navigation View Switcher (When Authenticated) */}
+          {adminUser && (
+            <div className="hidden sm:flex items-center gap-1 p-1 rounded-xl bg-[#070b14] border border-slate-800">
+              <button
+                onClick={() => setCurrentView('landing')}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition ${
+                  currentView === 'landing'
+                    ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Home
+              </button>
+              <button
+                onClick={() => setCurrentView('admin')}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition ${
+                  currentView === 'admin'
+                    ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Dashboard
+              </button>
+            </div>
+          )}
+
           {/* Live Bot Status Badge */}
           <BotStatusBadge />
 
