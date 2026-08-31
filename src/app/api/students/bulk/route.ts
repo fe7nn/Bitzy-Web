@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { bulkUpsertStudents } from '@/lib/db';
 import { Student } from '@/lib/types';
+import { requireAdmin } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
+  const authError = await requireAdmin(req);
+  if (authError) return authError;
+
   try {
     const body = await req.json();
     const students: Partial<Student>[] = Array.isArray(body) ? body : body.students;

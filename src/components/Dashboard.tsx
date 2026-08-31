@@ -1,19 +1,18 @@
 'use client';
 
 import React, { useState } from 'react';
-import { 
-  Users, 
-  UploadCloud, 
-  CheckCircle2, 
-  Clock, 
-  TrendingUp, 
-  Plus, 
-  Bot
+import {
+  Users,
+  UploadCloud,
+  CheckCircle2,
+  Clock,
+  TrendingUp,
+  Bot,
+  AlertTriangle
 } from 'lucide-react';
 import { Student, SystemStats, AdminUser } from '@/lib/types';
 import { StudentTable } from './StudentTable';
 import { CsvAutoImporter } from './CsvAutoImporter';
-import { StudentModal } from './StudentModal';
 
 interface DashboardProps {
   students: Student[];
@@ -33,41 +32,27 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onOpenBotSimulator,
 }) => {
   const [activeTab, setActiveTab] = useState<'masterlist' | 'csv'>('masterlist');
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  const handleSaveStudent = async (studentData: Partial<Student>): Promise<boolean> => {
-    try {
-      if (editingStudent) {
-        const res = await fetch(`/api/students/${editingStudent.student_id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(studentData),
-        });
-        if (!res.ok) throw new Error('Failed to update student');
-      } else {
-        const res = await fetch('/api/students', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(studentData),
-        });
-        if (!res.ok) throw new Error('Failed to create student');
-      }
-      onRefreshData();
-      return true;
-    } catch (err: any) {
-      alert(err.message || 'Error saving student record');
-      return false;
-    }
+  const showToast = (type: 'success' | 'error', message: string) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 4000);
   };
 
-  const handleDeleteStudent = async (studentId: string) => {
+  const handleVerifyStudent = async (studentId: string) => {
     try {
-      const res = await fetch(`/api/students/${studentId}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Failed to delete student');
+      const res = await fetch(`/api/students/${studentId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminUser.token}`,
+        },
+        body: JSON.stringify({ is_verified: true }),
+      });
+      if (!res.ok) throw new Error('Failed to verify student');
       onRefreshData();
     } catch (err: any) {
-      alert(err.message || 'Error deleting student');
+      alert(err.message || 'Error verifying student');
     }
   };
 
@@ -75,18 +60,19 @@ export const Dashboard: React.FC<DashboardProps> = ({
     try {
       const res = await fetch(`/api/students/${studentId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminUser.token}`,
+        },
         body: JSON.stringify({ action: 'unlink' }),
       });
       if (!res.ok) throw new Error('Failed to unlink Discord');
       onRefreshData();
+      showToast('success', `Discord account unlinked for ${studentId}.`);
     } catch (err: any) {
-      alert(err.message || 'Error unlinking Discord');
+      showToast('error', err.message || 'Error unlinking Discord');
     }
   };
-
-  const openAddModal = () => { setEditingStudent(null); setModalOpen(true); };
-  const openEditModal = (student: Student) => { setEditingStudent(student); setModalOpen(true); };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 animate-in fade-in duration-300">
@@ -116,23 +102,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <Bot className="w-4 h-4" />
             <span>Simulate /verify</span>
           </button>
-          <button
-            onClick={openAddModal}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-glow-blue transition hover:scale-105"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Student</span>
-          </button>
         </div>
       </div>
 
-      {/* Stats Bar */}
+      {/* Stats Bar — always reflects the currently loaded Masterlist */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="p-4 rounded-xl bg-[#0b1120] border border-slate-800 flex items-center justify-between shadow-md">
           <div>
             <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Total Masterlist</span>
             <span className="text-2xl font-black text-white font-mono mt-0.5 block">
-              {stats ? stats.total_students : students.length}
+              {students.length}
             </span>
             <span className="text-[10px] text-slate-400 font-medium">Registered records</span>
           </div>
@@ -145,7 +124,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div>
             <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Verified Members</span>
             <span className="text-2xl font-black text-emerald-400 font-mono mt-0.5 block">
-              {stats ? stats.verified_students : students.filter(s => s.is_verified).length}
+              {students.filter(s => s.is_verified).length}
             </span>
             <span className="text-[10px] text-emerald-500/80 font-medium">Discord linked</span>
           </div>
@@ -158,7 +137,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div>
             <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Pending Verification</span>
             <span className="text-2xl font-black text-amber-400 font-mono mt-0.5 block">
-              {stats ? stats.unverified_students : students.filter(s => !s.is_verified).length}
+              {students.filter(s => !s.is_verified).length}
             </span>
             <span className="text-[10px] text-amber-500/80 font-medium">Awaiting claim</span>
           </div>
@@ -171,7 +150,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div>
             <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Verification Rate</span>
             <span className="text-2xl font-black text-blue-400 font-mono mt-0.5 block">
-              {stats ? `${stats.verification_rate}%` : '0%'}
+              {students.length > 0
+                ? `${Math.round((students.filter(s => s.is_verified).length / students.length) * 100)}%`
+                : '0%'}
             </span>
             <span className="text-[10px] text-slate-400 font-medium">Community adoption</span>
           </div>
@@ -186,11 +167,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="flex items-center gap-4">
           <button
             onClick={() => setActiveTab('masterlist')}
-            className={`flex items-center gap-2 pb-3 text-xs font-bold transition border-b-2 ${
-              activeTab === 'masterlist'
-                ? 'text-blue-400 border-blue-500'
-                : 'text-slate-400 border-transparent hover:text-slate-200'
-            }`}
+            className={`flex items-center gap-2 pb-3 text-xs font-bold transition border-b-2 ${activeTab === 'masterlist'
+              ? 'text-blue-400 border-blue-500'
+              : 'text-slate-400 border-transparent hover:text-slate-200'
+              }`}
           >
             <Users className="w-4 h-4" />
             <span>Masterlist & Quick Stats</span>
@@ -201,11 +181,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
           <button
             onClick={() => setActiveTab('csv')}
-            className={`flex items-center gap-2 pb-3 text-xs font-bold transition border-b-2 ${
-              activeTab === 'csv'
-                ? 'text-blue-400 border-blue-500'
-                : 'text-slate-400 border-transparent hover:text-slate-200'
-            }`}
+            className={`flex items-center gap-2 pb-3 text-xs font-bold transition border-b-2 ${activeTab === 'csv'
+              ? 'text-blue-400 border-blue-500'
+              : 'text-slate-400 border-transparent hover:text-slate-200'
+              }`}
           >
             <UploadCloud className="w-4 h-4" />
             <span>Instant CSV Auto-Ingest</span>
@@ -220,30 +199,39 @@ export const Dashboard: React.FC<DashboardProps> = ({
             students={students}
             isLoading={isLoading}
             onRefresh={onRefreshData}
-            onOpenAddModal={openAddModal}
-            onOpenEditModal={openEditModal}
-            onDeleteStudent={handleDeleteStudent}
+            onVerifyStudent={handleVerifyStudent}
             onUnlinkDiscord={handleUnlinkDiscord}
           />
         )}
 
         {activeTab === 'csv' && (
           <CsvAutoImporter
+            existingStudents={students}
             onImportComplete={() => {
               onRefreshData();
               setActiveTab('masterlist');
             }}
+            adminToken={adminUser.token}
           />
         )}
       </div>
 
-      {/* Student Add/Edit Modal */}
-      <StudentModal
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-        onSave={handleSaveStudent}
-        student={editingStudent}
-      />
+      {/* In-system toast (unlink result) — no browser alert/confirm */}
+      {toast && (
+        <div
+          className={`fixed bottom-6 right-6 z-[60] flex items-center gap-2.5 px-4 py-3 rounded-xl border shadow-2xl text-xs font-semibold animate-in fade-in slide-in-from-bottom-2 duration-200 ${toast.type === 'success'
+              ? 'bg-emerald-950/95 border-emerald-700/60 text-emerald-300'
+              : 'bg-rose-950/95 border-rose-700/60 text-rose-300'
+            }`}
+        >
+          {toast.type === 'success' ? (
+            <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+          ) : (
+            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+          )}
+          <span>{toast.message}</span>
+        </div>
+      )}
     </div>
   );
 };

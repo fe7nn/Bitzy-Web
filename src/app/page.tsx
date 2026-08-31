@@ -6,6 +6,7 @@ import { LandingPage } from '@/components/LandingPage';
 import { Dashboard } from '@/components/Dashboard';
 import { BotSimulatorModal } from '@/components/BotSimulatorModal';
 import { Student, SystemStats, AdminUser } from '@/lib/types';
+import { supabaseAuth } from '@/lib/supabaseAuthClient';
 
 export default function HomePage() {
   const [currentView, setCurrentView] = useState<'landing' | 'admin'>('landing');
@@ -16,25 +17,54 @@ export default function HomePage() {
   const [isBotSimulatorOpen, setIsBotSimulatorOpen] = useState(false);
   const [supabaseConnected, setSupabaseConnected] = useState(false);
 
-  // 1. Initialize admin session from localStorage
+  // 1. Initialize admin session from Supabase (real, verifiable session)
   useEffect(() => {
-    try {
-      const savedUser = localStorage.getItem('bitzy_admin_user');
-      if (savedUser) {
-        setAdminUser(JSON.parse(savedUser));
+    supabaseAuth.auth.getSession().then(({ data }) => {
+      const session = data.session;
+      if (session?.user) {
+        const user: AdminUser = {
+          email: session.user.email || '',
+          name: (session.user.email || '').split('@')[0].toUpperCase(),
+          role: 'Admin',
+          token: session.access_token,
+        };
+        setAdminUser(user);
+        localStorage.setItem('bitzy_admin_user', JSON.stringify(user));
       }
-    } catch {
-      // ignore
-    }
+    });
+
+    // Keep the token fresh / clear state on sign-out from elsewhere (e.g. expiry)
+    const { data: listener } = supabaseAuth.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        const user: AdminUser = {
+          email: session.user.email || '',
+          name: (session.user.email || '').split('@')[0].toUpperCase(),
+          role: 'Admin',
+          token: session.access_token,
+        };
+        setAdminUser(user);
+        localStorage.setItem('bitzy_admin_user', JSON.stringify(user));
+      } else {
+        setAdminUser(null);
+        localStorage.removeItem('bitzy_admin_user');
+      }
+    });
+
+    return () => listener.subscription.unsubscribe();
   }, []);
 
-  // 2. Fetch students & stats
+  // 2. Fetch students & stats (admin-only endpoints — send the access token)
   const fetchData = useCallback(async () => {
+    if (!adminUser?.token) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
+      const authHeaders = { Authorization: `Bearer ${adminUser.token}` };
       const [studentsRes, statsRes] = await Promise.all([
-        fetch('/api/students'),
-        fetch('/api/stats'),
+        fetch('/api/students', { headers: authHeaders }),
+        fetch('/api/stats', { headers: authHeaders }),
       ]);
 
       if (studentsRes.ok) {
@@ -51,7 +81,7 @@ export default function HomePage() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [adminUser?.token]);
 
   useEffect(() => {
     fetchData();
@@ -69,7 +99,12 @@ export default function HomePage() {
   };
 
   // Admin logout handler
-  const handleAdminLogout = () => {
+  const handleAdminLogout = async () => {
+    try {
+      await supabaseAuth.auth.signOut();
+    } catch {
+      // ignore
+    }
     setAdminUser(null);
     try {
       localStorage.removeItem('bitzy_admin_user');

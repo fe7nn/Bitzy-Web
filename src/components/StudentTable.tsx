@@ -1,31 +1,27 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { 
-  Search, 
-  Filter, 
-  Download, 
-  Plus, 
-  RefreshCw, 
-  CheckCircle2, 
-  Clock, 
-  Link2Off, 
-  Edit, 
-  Trash2, 
-  ShieldCheck, 
+import {
+  Search,
+  Filter,
+  Download,
+  RefreshCw,
+  CheckCircle2,
+  Clock,
+  Link2Off,
+  ShieldCheck,
   ArrowUpDown,
   FileSpreadsheet
 } from 'lucide-react';
 import { Student } from '@/lib/types';
 import { formatStudentFullName } from '@/lib/db';
+import { ConfirmDialog } from './ConfirmDialog';
 
 interface StudentTableProps {
   students: Student[];
   isLoading: boolean;
   onRefresh: () => void;
-  onOpenAddModal: () => void;
-  onOpenEditModal: (student: Student) => void;
-  onDeleteStudent: (studentId: string) => Promise<void>;
+  onVerifyStudent: (studentId: string) => Promise<void>;
   onUnlinkDiscord: (studentId: string) => Promise<void>;
 }
 
@@ -33,16 +29,15 @@ export const StudentTable: React.FC<StudentTableProps> = ({
   students,
   isLoading,
   onRefresh,
-  onOpenAddModal,
-  onOpenEditModal,
-  onDeleteStudent,
+  onVerifyStudent,
   onUnlinkDiscord,
 }) => {
   const [search, setSearch] = useState('');
-  const [courseFilter, setCourseFilter] = useState('ALL');
   const [yearFilter, setYearFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [verifyTarget, setVerifyTarget] = useState<Student | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
 
   // Filtered List
   const filteredStudents = useMemo(() => {
@@ -50,11 +45,6 @@ export const StudentTable: React.FC<StudentTableProps> = ({
       // Search
       const searchTarget = `${s.student_id} ${s.last_name} ${s.first_name} ${s.middle_name || ''} ${s.discord_tag || ''} ${s.discord_id || ''}`.toLowerCase();
       if (search.trim() && !searchTarget.includes(search.toLowerCase().trim())) {
-        return false;
-      }
-
-      // Course filter
-      if (courseFilter !== 'ALL' && s.course.toUpperCase() !== courseFilter.toUpperCase()) {
         return false;
       }
 
@@ -69,7 +59,7 @@ export const StudentTable: React.FC<StudentTableProps> = ({
 
       return true;
     });
-  }, [students, search, courseFilter, yearFilter, statusFilter]);
+  }, [students, search, yearFilter, statusFilter]);
 
   // Export to CSV handler
   const handleExportCsv = () => {
@@ -97,25 +87,40 @@ export const StudentTable: React.FC<StudentTableProps> = ({
     document.body.removeChild(link);
   };
 
-  const handleUnlink = async (student: Student) => {
-    if (window.confirm(`Are you sure you want to unlink Discord for ${student.student_id} (${formatStudentFullName(student)})?`)) {
-      setActionLoadingId(student.student_id);
-      try {
-        await onUnlinkDiscord(student.student_id);
-      } finally {
-        setActionLoadingId(null);
-      }
+  const [unlinkTarget, setUnlinkTarget] = useState<Student | null>(null);
+  const [isUnlinking, setIsUnlinking] = useState(false);
+
+  const requestUnlink = (student: Student) => {
+    setUnlinkTarget(student);
+  };
+
+  const confirmUnlink = async () => {
+    if (!unlinkTarget) return;
+    setIsUnlinking(true);
+    setActionLoadingId(unlinkTarget.student_id);
+    try {
+      await onUnlinkDiscord(unlinkTarget.student_id);
+    } finally {
+      setIsUnlinking(false);
+      setActionLoadingId(null);
+      setUnlinkTarget(null);
     }
   };
 
-  const handleDelete = async (student: Student) => {
-    if (window.confirm(`Are you sure you want to permanently delete record for ${student.student_id} (${formatStudentFullName(student)})?`)) {
-      setActionLoadingId(student.student_id);
-      try {
-        await onDeleteStudent(student.student_id);
-      } finally {
-        setActionLoadingId(null);
-      }
+  const requestVerify = (student: Student) => {
+    setVerifyTarget(student);
+  };
+
+  const confirmVerify = async () => {
+    if (!verifyTarget) return;
+    setIsVerifying(true);
+    setActionLoadingId(verifyTarget.student_id);
+    try {
+      await onVerifyStudent(verifyTarget.student_id);
+    } finally {
+      setIsVerifying(false);
+      setActionLoadingId(null);
+      setVerifyTarget(null);
     }
   };
 
@@ -137,20 +142,6 @@ export const StudentTable: React.FC<StudentTableProps> = ({
 
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Course Filter */}
-          <select
-            value={courseFilter}
-            onChange={e => setCourseFilter(e.target.value)}
-            className="px-3 py-2 rounded-lg bg-[#070b14] border border-slate-700/80 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
-          >
-            <option value="ALL">All Courses</option>
-            <option value="BSCPE">BSCpE</option>
-            <option value="BSCS">BSCS</option>
-            <option value="BSIT">BSIT</option>
-            <option value="BSIS">BSIS</option>
-            <option value="BSECE">BSECE</option>
-          </select>
-
           {/* Year Filter */}
           <select
             value={yearFilter}
@@ -193,15 +184,6 @@ export const StudentTable: React.FC<StudentTableProps> = ({
             <Download className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Export CSV</span>
           </button>
-
-          {/* Add Student Button */}
-          <button
-            onClick={onOpenAddModal}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-glow-blue transition"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Student</span>
-          </button>
         </div>
       </div>
 
@@ -240,8 +222,8 @@ export const StudentTable: React.FC<StudentTableProps> = ({
                   const fullName = formatStudentFullName(student);
 
                   return (
-                    <tr 
-                      key={student.student_id} 
+                    <tr
+                      key={student.student_id}
                       className="hover:bg-slate-800/40 transition-colors group"
                     >
                       {/* Student ID */}
@@ -261,11 +243,10 @@ export const StudentTable: React.FC<StudentTableProps> = ({
 
                       {/* Course */}
                       <td className="py-3.5 px-4">
-                        <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
-                          student.course.toUpperCase() === 'BSCPE' 
-                            ? 'bg-orange-500/15 text-orange-400 border border-orange-500/30' 
-                            : 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
-                        }`}>
+                        <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${student.course.toUpperCase() === 'BSCPE'
+                          ? 'bg-orange-500/15 text-orange-400 border border-orange-500/30'
+                          : 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
+                          }`}>
                           {student.course}
                         </span>
                       </td>
@@ -306,7 +287,7 @@ export const StudentTable: React.FC<StudentTableProps> = ({
                         <div className="inline-flex items-center gap-1.5">
                           {student.is_verified && (
                             <button
-                              onClick={() => handleUnlink(student)}
+                              onClick={() => requestUnlink(student)}
                               disabled={isActionLoading}
                               title="Unlink Discord account"
                               className="p-1.5 rounded-md bg-amber-950/30 hover:bg-amber-900/50 text-amber-400 border border-amber-800/40 transition hover:scale-105"
@@ -315,23 +296,17 @@ export const StudentTable: React.FC<StudentTableProps> = ({
                             </button>
                           )}
 
-                          <button
-                            onClick={() => onOpenEditModal(student)}
-                            disabled={isActionLoading}
-                            title="Edit Record"
-                            className="p-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 transition hover:scale-105"
-                          >
-                            <Edit className="w-3.5 h-3.5" />
-                          </button>
-
-                          <button
-                            onClick={() => handleDelete(student)}
-                            disabled={isActionLoading}
-                            title="Delete Record"
-                            className="p-1.5 rounded-md bg-rose-950/30 hover:bg-rose-900/50 text-rose-400 border border-rose-800/40 transition hover:scale-105"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          {!student.is_verified && (
+                            <button
+                              onClick={() => requestVerify(student)}
+                              disabled={isActionLoading}
+                              title="Verify Student"
+                              className="flex items-center gap-1 px-2 py-1.5 rounded-md bg-emerald-950/30 hover:bg-emerald-900/50 text-emerald-400 border border-emerald-800/40 transition hover:scale-105"
+                            >
+                              <ShieldCheck className="w-3.5 h-3.5" />
+                              <span className="text-[11px] font-semibold">Verify</span>
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -356,6 +331,57 @@ export const StudentTable: React.FC<StudentTableProps> = ({
           </div>
         </div>
       </div>
+
+      {/* In-system Verify Confirmation */}
+      <ConfirmDialog
+        isOpen={!!verifyTarget}
+        title="Verify Student"
+        variant="default"
+        isProcessing={isVerifying}
+        confirmLabel="Verify Student"
+        onConfirm={confirmVerify}
+        onCancel={() => setVerifyTarget(null)}
+        message={
+          verifyTarget && (
+            <>
+              <p>
+                Verify <span className="font-semibold text-white">{verifyTarget.student_id}</span>{' '}
+                (<span className="font-semibold text-white">{formatStudentFullName(verifyTarget)}</span>) as an ICpEP.SE member?
+              </p>
+              <p className="text-slate-400">
+                This marks the student as verified in the masterlist. This action does not link a Discord account — use the Discord bot's{' '}
+                <span className="font-mono text-slate-300">/verify</span> command for that.
+              </p>
+            </>
+          )
+        }
+      />
+
+      {/* In-system Unlink Discord Confirmation */}
+      <ConfirmDialog
+        isOpen={!!unlinkTarget}
+        title="Unlink Discord Account"
+        variant="danger"
+        isProcessing={isUnlinking}
+        confirmLabel="Unlink Discord"
+        onConfirm={confirmUnlink}
+        onCancel={() => setUnlinkTarget(null)}
+        message={
+          unlinkTarget && (
+            <>
+              <p>
+                Unlink the Discord account from{' '}
+                <span className="font-semibold text-white">{unlinkTarget.student_id}</span>{' '}
+                (<span className="font-semibold text-white">{formatStudentFullName(unlinkTarget)}</span>)?
+              </p>
+              <p className="text-slate-400">
+                This removes their Discord verification. They'll need to run the bot's{' '}
+                <span className="font-mono text-slate-300">/verify</span> command again to relink an account.
+              </p>
+            </>
+          )
+        }
+      />
     </div>
   );
 };

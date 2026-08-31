@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStudentById, upsertStudent, deleteStudent, unlinkDiscord } from '@/lib/db';
 import { Student } from '@/lib/types';
+import { requireAdmin } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,6 +9,9 @@ export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const authError = await requireAdmin(req);
+  if (authError) return authError;
+
   try {
     const student = await getStudentById(params.id);
     if (!student) {
@@ -23,6 +27,9 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const authError = await requireAdmin(req);
+  if (authError) return authError;
+
   try {
     const body = await req.json();
     const existing = await getStudentById(params.id);
@@ -64,6 +71,9 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const authError = await requireAdmin(req);
+  if (authError) return authError;
+
   try {
     const success = await deleteStudent(params.id);
     if (!success) {

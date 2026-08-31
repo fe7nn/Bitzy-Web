@@ -1,129 +1,9 @@
 import { Student, SystemStats, VerificationRequest, VerificationResponse } from './types';
 import { getSupabaseClient } from './supabase';
 
-// Seed initial BSCpE students according to the ICpEP.SE community guidelines
-const INITIAL_STUDENTS: Student[] = [
-  {
-    student_id: '2024-00101',
-    last_name: 'Dela Cruz',
-    first_name: 'Juan',
-    middle_name: 'Santos',
-    course: 'BSCpE',
-    year_level: '3rd Year',
-    is_verified: true,
-    discord_id: '812938491029384756',
-    discord_tag: 'juandelacruz#1234',
-    verified_at: '2026-08-20T10:15:30Z',
-  },
-  {
-    student_id: '2024-00102',
-    last_name: 'Villanueva',
-    first_name: 'Maria Clara',
-    middle_name: 'Reyes',
-    course: 'BSCpE',
-    year_level: '4th Year',
-    is_verified: true,
-    discord_id: '729103847592817465',
-    discord_tag: 'mariac#4567',
-    verified_at: '2026-08-22T14:32:10Z',
-  },
-  {
-    student_id: '2024-00103',
-    last_name: 'Tan',
-    first_name: 'Mark Anthony',
-    middle_name: 'Lim',
-    course: 'BSCpE',
-    year_level: '2nd Year',
-    is_verified: false,
-    discord_id: null,
-    discord_tag: null,
-    verified_at: null,
-  },
-  {
-    student_id: '2024-00104',
-    last_name: 'Garcia',
-    first_name: 'Angelo',
-    middle_name: 'Bautista',
-    course: 'BSCpE',
-    year_level: '1st Year',
-    is_verified: false,
-    discord_id: null,
-    discord_tag: null,
-    verified_at: null,
-  },
-  {
-    student_id: '2024-00105',
-    last_name: 'Mendoza',
-    first_name: 'Christine Joy',
-    middle_name: 'Alvarez',
-    course: 'BSCpE',
-    year_level: '4th Year',
-    is_verified: true,
-    discord_id: '619283746501928374',
-    discord_tag: 'cjoy_m#8899',
-    verified_at: '2026-08-25T09:04:45Z',
-  },
-  {
-    student_id: '2024-00106',
-    last_name: 'Aquino',
-    first_name: 'Kenneth',
-    middle_name: 'Flores',
-    course: 'BSCS',
-    year_level: '3rd Year',
-    is_verified: false,
-    discord_id: null,
-    discord_tag: null,
-    verified_at: null,
-  },
-  {
-    student_id: '2024-00107',
-    last_name: 'Ramos',
-    first_name: 'Patricia',
-    middle_name: 'Diaz',
-    course: 'BSIT',
-    year_level: '2nd Year',
-    is_verified: false,
-    discord_id: null,
-    discord_tag: null,
-    verified_at: null,
-  },
-  {
-    student_id: '2024-00108',
-    last_name: 'Salazar',
-    first_name: 'John Paul',
-    middle_name: 'Ocampo',
-    course: 'BSCpE',
-    year_level: '5th Year',
-    is_verified: true,
-    discord_id: '901827364519283746',
-    discord_tag: 'jpsalazar#0001',
-    verified_at: '2026-08-26T16:20:00Z',
-  },
-  {
-    student_id: '2024-00109',
-    last_name: 'Navarro',
-    first_name: 'Bea Samantha',
-    middle_name: 'Cruz',
-    course: 'BSCpE',
-    year_level: '3rd Year',
-    is_verified: false,
-    discord_id: null,
-    discord_tag: null,
-    verified_at: null,
-  },
-  {
-    student_id: '2024-00110',
-    last_name: 'Castillo',
-    first_name: 'Dominic',
-    middle_name: 'Torres',
-    course: 'BSCpE',
-    year_level: '1st Year',
-    is_verified: false,
-    discord_id: null,
-    discord_tag: null,
-    verified_at: null,
-  },
-];
+// In-memory fallback masterlist. Students are added via CSV import or the API
+// (no students are seeded by default).
+const INITIAL_STUDENTS: Student[] = [];
 
 // Global in-memory storage fallback
 declare global {
@@ -244,7 +124,7 @@ export async function upsertStudent(student: Student): Promise<Student> {
   }
 }
 
-export async function bulkUpsertStudents(newStudents: Partial<Student>[]): Promise<{ inserted: number; updated: number; total: number }> {
+export async function bulkUpsertStudents(newStudents: Partial<Student>[]): Promise<{ inserted: number; updated: number; deleted: number; total: number }> {
   // Normalize course names to canonical values to satisfy DB check constraints
   // Coerce all courses to the canonical BSCpE value. Accept common variants like BSCPE.
   const COURSE_MAP: Record<string, string> = {
@@ -262,11 +142,11 @@ export async function bulkUpsertStudents(newStudents: Partial<Student>[]): Promi
   }
 
   const year_level_map: Record<string, string> = {
-    '1': '1st Year',
-    '2': '2nd Year',
-    '3': '3rd Year',
-    '4': '4th Year',
-    '5': '5th Year',
+    '1': '1st Year', '1st Year': '1st Year', '1st': '1st Year',
+    '2': '2nd Year', '2nd Year': '2nd Year', '2nd': '2nd Year',
+    '3': '3rd Year', '3rd Year': '3rd Year', '3rd': '3rd Year',
+    '4': '4th Year', '4th Year': '4th Year', '4th': '4th Year',
+    '5': '5th Year', '5th Year': '5th Year', '5th': '5th Year',
   };
 
   function normalizeYearLevel(raw?: string | null): string {
@@ -291,15 +171,65 @@ export async function bulkUpsertStudents(newStudents: Partial<Student>[]): Promi
     }));
 
   if (sanitized.length === 0) {
-    return { inserted: 0, updated: 0, total: 0 };
+    return { inserted: 0, updated: 0, deleted: 0, total: 0 };
   }
+
+  // --- Masterlist Sync Rules ----------------------------------------------
+  // A CSV import represents the full, authoritative masterlist for that
+  // upload. Two rules apply when reconciling it against what's already
+  // stored:
+  //
+  //   1) If a student already exists AND is verified, and they ARE still
+  //      present in this new import, keep their existing verification/
+  //      Discord-link data intact (is_verified, discord_id, discord_tag,
+  //      verified_at) — only their name/course/year_level fields are
+  //      refreshed from the CSV. This prevents a naive re-import from
+  //      wiping out real verification data.
+  //
+  //   2) If an existing student is NOT present in this new import at all,
+  //      their record is removed entirely from the masterlist (they are no
+  //      longer part of the official list represented by this CSV).
+  const existingStudents = await getAllStudents();
+  const existingById = new Map(existingStudents.map(s => [s.student_id.toLowerCase(), s]));
+  const incomingIds = new Set(sanitized.map(s => s.student_id.toLowerCase()));
+
+  const reconciled: Student[] = sanitized.map(s => {
+    const existing = existingById.get(s.student_id.toLowerCase());
+    if (existing && existing.is_verified) {
+      return {
+        ...s,
+        is_verified: existing.is_verified,
+        discord_id: existing.discord_id,
+        discord_tag: existing.discord_tag,
+        verified_at: existing.verified_at,
+      };
+    }
+    return s;
+  });
+
+  const toRemove: Student[] = existingStudents.filter(
+    s => !incomingIds.has(s.student_id.toLowerCase())
+  );
+  // ------------------------------------------------------------------------
 
   const supabase = getSupabaseClient();
 
   if (supabase) {
+    if (toRemove.length > 0) {
+      const { error: deleteError } = await supabase
+        .from('students')
+        .delete()
+        .in('student_id', toRemove.map(s => s.student_id));
+
+      if (deleteError) {
+        console.error('[Supabase bulkUpsert delete ERROR]', deleteError.message);
+        throw new Error(`Supabase delete failed while syncing masterlist: ${deleteError.message}`);
+      }
+    }
+
     const { error } = await supabase
       .from('students')
-      .upsert(sanitized, { onConflict: 'student_id' });
+      .upsert(reconciled, { onConflict: 'student_id' });
 
     if (error) {
       console.error('[Supabase bulkUpsert ERROR]', JSON.stringify(error, null, 2));
@@ -307,8 +237,11 @@ export async function bulkUpsertStudents(newStudents: Partial<Student>[]): Promi
       throw new Error(`Supabase upsert failed: ${error.message} (code: ${error.code})`);
     }
 
-    console.log(`[Supabase] Successfully upserted ${sanitized.length} student records.`);
-    return { inserted: sanitized.length, updated: 0, total: sanitized.length };
+    if (toRemove.length > 0) {
+      console.log(`[Supabase] Removed ${toRemove.length} student(s) no longer present in the imported masterlist.`);
+    }
+    console.log(`[Supabase] Successfully upserted ${reconciled.length} student records.`);
+    return { inserted: reconciled.length, updated: 0, deleted: toRemove.length, total: reconciled.length };
   }
 
   // No Supabase client configured — write to memory fallback
@@ -317,7 +250,7 @@ export async function bulkUpsertStudents(newStudents: Partial<Student>[]): Promi
   let inserted = 0;
   let updated = 0;
 
-  for (const s of sanitized) {
+  for (const s of reconciled) {
     const idx = list.findIndex(item => item.student_id.toLowerCase() === s.student_id.toLowerCase());
     if (idx >= 0) {
       list[idx] = { ...list[idx], ...s };
@@ -328,7 +261,20 @@ export async function bulkUpsertStudents(newStudents: Partial<Student>[]): Promi
     }
   }
 
-  return { inserted, updated, total: sanitized.length };
+  // Remove students who dropped off the imported masterlist entirely.
+  let deleted = 0;
+  for (let i = list.length - 1; i >= 0; i--) {
+    if (!incomingIds.has(list[i].student_id.toLowerCase())) {
+      list.splice(i, 1);
+      deleted++;
+    }
+  }
+
+  if (deleted > 0) {
+    console.warn(`[db] Removed ${deleted} student(s) no longer present in the imported masterlist.`);
+  }
+
+  return { inserted, updated, deleted, total: sanitized.length };
 }
 
 export async function deleteStudent(student_id: string): Promise<boolean> {

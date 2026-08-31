@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { testSupabaseConnection, setRuntimeSupabaseConfig, getSupabaseClient } from '@/lib/supabase';
+import { requireAdmin } from '@/lib/auth';
 import fs from 'fs';
 import path from 'path';
 
@@ -18,6 +19,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const authError = await requireAdmin(req);
+  if (authError) return authError;
+
   try {
     const { url, key } = await req.json();
 
