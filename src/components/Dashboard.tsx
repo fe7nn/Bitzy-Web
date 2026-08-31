@@ -8,11 +8,14 @@ import {
   Clock,
   TrendingUp,
   Bot,
-  AlertTriangle
+  AlertTriangle,
+  BarChart3,
+  Activity,
 } from 'lucide-react';
 import { Student, SystemStats, AdminUser } from '@/lib/types';
 import { StudentTable } from './StudentTable';
 import { CsvAutoImporter } from './CsvAutoImporter';
+import { AnalyticsAndBotHealth } from './AnalyticsAndBotHealth';
 
 interface DashboardProps {
   students: Student[];
@@ -31,7 +34,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   adminUser,
   onOpenBotSimulator,
 }) => {
-  const [activeTab, setActiveTab] = useState<'masterlist' | 'csv'>('masterlist');
+  const [activeTab, setActiveTab] = useState<'masterlist' | 'csv' | 'analytics'>('masterlist');
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const showToast = (type: 'success' | 'error', message: string) => {
@@ -189,6 +192,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <UploadCloud className="w-4 h-4" />
             <span>Instant CSV Auto-Ingest</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab('analytics')}
+            className={`flex items-center gap-2 pb-3 text-xs font-bold transition border-b-2 ${activeTab === 'analytics'
+              ? 'text-blue-400 border-blue-500'
+              : 'text-slate-400 border-transparent hover:text-slate-200'
+              }`}
+          >
+            <BarChart3 className="w-4 h-4" />
+            <span>Analytics & Bot Diagnostics</span>
+            <span className="flex h-2 w-2 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+          </button>
         </div>
       </div>
 
@@ -212,6 +230,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
               setActiveTab('masterlist');
             }}
             adminToken={adminUser.token}
+          />
+        )}
+
+        {activeTab === 'analytics' && (
+          <AnalyticsAndBotHealth
+            students={students}
+            stats={stats}
+            onOpenBotSimulator={onOpenBotSimulator}
           />
         )}
       </div>
