@@ -33,6 +33,7 @@ const {
   Routes,
   SlashCommandBuilder,
   PermissionFlagsBits,
+  MessageFlags,
 } = require('discord.js');
 const { createClient } = require('@supabase/supabase-js');
 const express = require('express');
@@ -493,7 +494,7 @@ client.on('interactionCreate', async interaction => {
   // --- B. Handle Modal Submissions ---
   if (interaction.isModalSubmit()) {
     if (interaction.customId === 'modal_verify_student') {
-      await interaction.deferReply({ ephemeral: true });
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
       const studentIdInput = interaction.fields.getTextInputValue('input_student_id');
 
@@ -541,7 +542,7 @@ client.on('interactionCreate', async interaction => {
 
   // 1. Command: /verify
   if (commandName === 'verify') {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     const studentIdInput = interaction.options.getString('student_id');
 
@@ -593,13 +594,13 @@ client.on('interactionCreate', async interaction => {
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageMessages)) {
       return interaction.reply({
         content: '❌ You do not have permission to manage messages in this channel.',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
 
     const amount = interaction.options.getInteger('amount');
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
       const deletedMessages = await interaction.channel.bulkDelete(amount, true);
@@ -620,13 +621,13 @@ client.on('interactionCreate', async interaction => {
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
       return interaction.reply({
         content: '❌ Only Administrators can post the official verification guide banner.',
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
 
     const shouldMentionUnverified = interaction.options.getBoolean('mention_unverified') ?? true;
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
       const unverifiedRole = interaction.guild.roles.cache.find(r => r.name.toLowerCase() === 'unverified');
