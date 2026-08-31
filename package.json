@@ -6,12 +6,18 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "bot:dev": "node bot/bot.js",
+    "bot:start": "node bot/bot.js",
+    "bot:deploy-commands": "node bot/deploy-commands.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.48.1",
     "canvas-confetti": "^1.9.4",
     "clsx": "^2.1.1",
+    "discord.js": "^14.22.1",
+    "dotenv": "^17.2.2",
+    "express": "^5.1.0",
     "lucide-react": "^0.475.0",
     "next": "^14.2.18",
     "papaparse": "^5.5.2",

@@ -11,6 +11,8 @@ interface NavbarProps {
   adminUser: AdminUser | null;
   onOpenLoginModal: () => void;
   onLogout: () => void;
+  onOpenBotSimulator?: () => void;
+  supabaseConnected?: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
