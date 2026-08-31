@@ -11,11 +11,16 @@ import {
   Link2Off,
   ShieldCheck,
   ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
   FileSpreadsheet
 } from 'lucide-react';
 import { Student } from '@/lib/types';
 import { formatStudentFullName } from '@/lib/db';
 import { ConfirmDialog } from './ConfirmDialog';
+
+type SortKey = 'student_id' | 'name' | 'course' | 'year_level' | 'status';
+type SortDirection = 'asc' | 'desc';
 
 interface StudentTableProps {
   students: Student[];
@@ -38,6 +43,28 @@ export const StudentTable: React.FC<StudentTableProps> = ({
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [verifyTarget, setVerifyTarget] = useState<Student | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [sortKey, setSortKey] = useState<SortKey>('name');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDirection('asc');
+    }
+  };
+
+  const renderSortIcon = (key: SortKey) => {
+    if (sortKey !== key) {
+      return <ArrowUpDown className="w-3 h-3 text-slate-600 group-hover:text-slate-400 transition-colors" />;
+    }
+    return sortDirection === 'asc' ? (
+      <ArrowUp className="w-3 h-3 text-blue-400" />
+    ) : (
+      <ArrowDown className="w-3 h-3 text-blue-400" />
+    );
+  };
 
   // Filtered List
   const filteredStudents = useMemo(() => {
@@ -61,10 +88,37 @@ export const StudentTable: React.FC<StudentTableProps> = ({
     });
   }, [students, search, yearFilter, statusFilter]);
 
+  // Sorted List (sorting happens after filtering so it applies to what's on screen)
+  const sortedStudents = useMemo(() => {
+    const list = [...filteredStudents];
+    const dir = sortDirection === 'asc' ? 1 : -1;
+
+    list.sort((a, b) => {
+      switch (sortKey) {
+        case 'student_id':
+          return a.student_id.localeCompare(b.student_id) * dir;
+        case 'course':
+          return a.course.localeCompare(b.course) * dir;
+        case 'year_level':
+          return a.year_level.localeCompare(b.year_level) * dir;
+        case 'status':
+          return (Number(a.is_verified) - Number(b.is_verified)) * dir;
+        case 'name':
+        default: {
+          const lastCmp = a.last_name.localeCompare(b.last_name);
+          const cmp = lastCmp !== 0 ? lastCmp : a.first_name.localeCompare(b.first_name);
+          return cmp * dir;
+        }
+      }
+    });
+
+    return list;
+  }, [filteredStudents, sortKey, sortDirection]);
+
   // Export to CSV handler
   const handleExportCsv = () => {
     const headers = ['student_id', 'last_name', 'first_name', 'middle_name', 'course', 'year_level', 'is_verified', 'discord_id', 'discord_tag', 'verified_at'];
-    const rows = filteredStudents.map(s => [
+    const rows = sortedStudents.map(s => [
       s.student_id,
       `"${s.last_name}"`,
       `"${s.first_name}"`,
@@ -193,11 +247,51 @@ export const StudentTable: React.FC<StudentTableProps> = ({
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="border-b border-slate-800 bg-[#070b14]/90 text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
-                <th className="py-3.5 px-4">Student ID</th>
-                <th className="py-3.5 px-4">Official Name</th>
-                <th className="py-3.5 px-4">Course</th>
-                <th className="py-3.5 px-4">Year Level</th>
-                <th className="py-3.5 px-4">Discord Verification</th>
+                <th className="py-3.5 px-4">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('student_id')}
+                    className="group flex items-center gap-1.5 hover:text-slate-200 transition-colors"
+                  >
+                    Student ID {renderSortIcon('student_id')}
+                  </button>
+                </th>
+                <th className="py-3.5 px-4">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('name')}
+                    className="group flex items-center gap-1.5 hover:text-slate-200 transition-colors"
+                  >
+                    Official Name {renderSortIcon('name')}
+                  </button>
+                </th>
+                <th className="py-3.5 px-4">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('course')}
+                    className="group flex items-center gap-1.5 hover:text-slate-200 transition-colors"
+                  >
+                    Course {renderSortIcon('course')}
+                  </button>
+                </th>
+                <th className="py-3.5 px-4">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('year_level')}
+                    className="group flex items-center gap-1.5 hover:text-slate-200 transition-colors"
+                  >
+                    Year Level {renderSortIcon('year_level')}
+                  </button>
+                </th>
+                <th className="py-3.5 px-4">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('status')}
+                    className="group flex items-center gap-1.5 hover:text-slate-200 transition-colors"
+                  >
+                    Discord Verification {renderSortIcon('status')}
+                  </button>
+                </th>
                 <th className="py-3.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
@@ -217,7 +311,7 @@ export const StudentTable: React.FC<StudentTableProps> = ({
                   </td>
                 </tr>
               ) : (
-                filteredStudents.map(student => {
+                sortedStudents.map(student => {
                   const isActionLoading = actionLoadingId === student.student_id;
                   const fullName = formatStudentFullName(student);
 
