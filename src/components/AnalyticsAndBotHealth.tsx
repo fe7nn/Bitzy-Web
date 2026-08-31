@@ -25,7 +25,8 @@ import {
   Calendar,
   Sparkles
 } from 'lucide-react';
-import { Student, SystemStats, BotStatusInfo } from '@/lib/types';
+import { Student, SystemStats, BotStatusInfo, GuildSettings } from '@/lib/types';
+import { useApp } from '@/context/AppContext';
 
 interface AnalyticsAndBotHealthProps {
   students: Student[];
@@ -38,10 +39,74 @@ export const AnalyticsAndBotHealth: React.FC<AnalyticsAndBotHealthProps> = ({
   stats,
   onOpenBotSimulator,
 }) => {
+  const { adminUser, showToast } = useApp();
   const [botStatus, setBotStatus] = useState<BotStatusInfo | null>(null);
   const [isLoadingStatus, setIsLoadingStatus] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
+
+  // Dynamic Guild Settings State
+  const [guildSettings, setGuildSettings] = useState<GuildSettings>({
+    guild_id: 'default',
+    guild_name: 'ICpEP.SE CIT - U Chapter',
+    verified_role_name: 'ka-CpE',
+    unverified_role_name: 'Unverified',
+    verify_channel_name: 'verify',
+    nickname_format: 'First M. Last',
+    auto_delete_seconds: 6,
+  });
+  const [isLoadingSettings, setIsLoadingSettings] = useState(true);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+
+  // Fetch current guild settings
+  const fetchSettings = useCallback(async () => {
+    try {
+      const res = await fetch('/api/settings/guild');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.settings) {
+          setGuildSettings(json.settings);
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to load guild settings:', err);
+    } finally {
+      setIsLoadingSettings(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
+
+  // Save updated guild settings
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminUser?.token) {
+      showToast('error', 'Admin authorization required to modify server settings.');
+      return;
+    }
+    setIsSavingSettings(true);
+    try {
+      const res = await fetch('/api/settings/guild', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminUser.token}`,
+        },
+        body: JSON.stringify(guildSettings),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to save settings');
+      }
+      showToast('success', '✅ Discord bot server settings updated & synced!');
+    } catch (err: any) {
+      showToast('error', err.message || 'Error saving guild settings');
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
 
   const fetchStatus = useCallback(async (manual = false) => {
     if (manual) setIsRefreshing(true);
@@ -401,7 +466,142 @@ export const AnalyticsAndBotHealth: React.FC<AnalyticsAndBotHealthProps> = ({
         </div>
       </div>
 
-      {/* 4. Discord Bot Commands & Administrative Operations Guide */}
+      {/* 4. Dynamic Server & Role Configuration Editor */}
+      <div className="p-6 rounded-2xl bg-[#0b1120] border border-slate-800 shadow-xl space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-white">Dynamic Server & Role Configuration</h3>
+              <p className="text-xs text-slate-400">
+                Customize verified role names, channel triggers, and nickname formats in real-time without redeploying.
+              </p>
+            </div>
+          </div>
+          <span className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20 w-fit">
+            guild_settings Table Active
+          </span>
+        </div>
+
+        <form onSubmit={handleSaveSettings} className="space-y-4 text-xs">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Field 1: Verified Role Name */}
+            <div className="space-y-1.5">
+              <label className="font-semibold text-slate-300 block">
+                Verified Role Name <span className="text-blue-400">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={guildSettings.verified_role_name}
+                onChange={e =>
+                  setGuildSettings({ ...guildSettings, verified_role_name: e.target.value })
+                }
+                placeholder="e.g. ka-CpE"
+                className="w-full px-3 py-2 rounded-xl bg-[#070b14] border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono text-xs"
+              />
+              <span className="text-[10px] text-slate-500 block">Role automatically granted to verified members</span>
+            </div>
+
+            {/* Field 2: Unverified Role to Remove */}
+            <div className="space-y-1.5">
+              <label className="font-semibold text-slate-300 block">
+                Unverified Role to Remove
+              </label>
+              <input
+                type="text"
+                value={guildSettings.unverified_role_name}
+                onChange={e =>
+                  setGuildSettings({ ...guildSettings, unverified_role_name: e.target.value })
+                }
+                placeholder="e.g. Unverified"
+                className="w-full px-3 py-2 rounded-xl bg-[#070b14] border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono text-xs"
+              />
+              <span className="text-[10px] text-slate-500 block">Stripped from member upon successful verification</span>
+            </div>
+
+            {/* Field 3: Verify Channel Name */}
+            <div className="space-y-1.5">
+              <label className="font-semibold text-slate-300 block">
+                Verification Channel Name <span className="text-blue-400">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={guildSettings.verify_channel_name}
+                onChange={e =>
+                  setGuildSettings({ ...guildSettings, verify_channel_name: e.target.value })
+                }
+                placeholder="e.g. verify"
+                className="w-full px-3 py-2 rounded-xl bg-[#070b14] border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono text-xs"
+              />
+              <span className="text-[10px] text-slate-500 block">Discord text channel listened by Bitzy</span>
+            </div>
+
+            {/* Field 4: Nickname Format */}
+            <div className="space-y-1.5">
+              <label className="font-semibold text-slate-300 block">
+                Member Nickname Format
+              </label>
+              <select
+                value={guildSettings.nickname_format}
+                onChange={e =>
+                  setGuildSettings({ ...guildSettings, nickname_format: e.target.value })
+                }
+                className="w-full px-3 py-2 rounded-xl bg-[#070b14] border border-slate-700 text-white focus:outline-none focus:border-blue-500 text-xs font-mono"
+              >
+                <option value="First M. Last">First M. Last (e.g. Juan D. Cruz)</option>
+                <option value="First Last">First Last (e.g. Juan Cruz)</option>
+                <option value="Last, First M.">Last, First M. (e.g. Cruz, Juan D.)</option>
+              </select>
+              <span className="text-[10px] text-slate-500 block">Format applied to member server nickname</span>
+            </div>
+
+            {/* Field 5: Auto-Delete Seconds */}
+            <div className="space-y-1.5">
+              <label className="font-semibold text-slate-300 block">
+                Chat Auto-Purge Delay (Seconds)
+              </label>
+              <input
+                type="number"
+                min={3}
+                max={60}
+                value={guildSettings.auto_delete_seconds}
+                onChange={e =>
+                  setGuildSettings({ ...guildSettings, auto_delete_seconds: Number(e.target.value) })
+                }
+                className="w-full px-3 py-2 rounded-xl bg-[#070b14] border border-slate-700 text-white focus:outline-none focus:border-blue-500 font-mono text-xs"
+              />
+              <span className="text-[10px] text-slate-500 block">Seconds before chat messages in #verify are purged</span>
+            </div>
+
+            {/* Action Submit Button */}
+            <div className="flex items-end">
+              <button
+                type="submit"
+                disabled={isSavingSettings || isLoadingSettings}
+                className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow-glow-blue transition hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isSavingSettings ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Synchronizing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Save Server Configuration</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      {/* 5. Discord Bot Commands & Administrative Operations Guide */}
       <div className="p-6 rounded-2xl bg-[#0b1120] border border-slate-800 shadow-xl space-y-6">
         <div className="flex items-center justify-between pb-4 border-b border-slate-800">
           <div className="flex items-center gap-3">

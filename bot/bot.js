@@ -118,20 +118,55 @@ const slashCommands = [
 // ------------------------------------------------------------------------------
 // Helper: Format Student Names
 // ------------------------------------------------------------------------------
-function formatStudentDisplayName(student) {
-  const mInitial =
-    student.middle_name && student.middle_name.trim().length > 0
-      ? ` ${student.middle_name.trim().charAt(0).toUpperCase()}.`
-      : '';
-  return `${student.first_name}${mInitial} ${student.last_name}`;
+// Dynamic Guild Settings Cache (Loaded from Supabase guild_settings table)
+// ------------------------------------------------------------------------------
+let cachedSettings = null;
+let lastSettingsFetch = 0;
+
+async function getGuildSettings() {
+  const now = Date.now();
+  if (cachedSettings && now - lastSettingsFetch < 30000) {
+    return cachedSettings;
+  }
+  try {
+    const { data } = await supabase
+      .from('guild_settings')
+      .select('*')
+      .eq('guild_id', 'default')
+      .maybeSingle();
+
+    if (data) {
+      cachedSettings = data;
+      lastSettingsFetch = now;
+      return data;
+    }
+  } catch (err) {
+    console.warn('[Settings Cache] Failed to load guild_settings:', err.message);
+  }
+  return {
+    guild_id: 'default',
+    guild_name: 'ICpEP.SE CIT - U Chapter',
+    verified_role_name: 'ka-CpE',
+    unverified_role_name: 'Unverified',
+    verify_channel_name: 'verify',
+    nickname_format: 'First M. Last',
+    auto_delete_seconds: 6,
+  };
 }
 
-function formatFormalName(student) {
+function formatStudentDisplayName(student, format = 'First M. Last') {
   const mInitial =
     student.middle_name && student.middle_name.trim().length > 0
       ? ` ${student.middle_name.trim().charAt(0).toUpperCase()}.`
       : '';
-  return `${student.last_name}, ${student.first_name}${mInitial}`;
+
+  if (format === 'Last, First M.') {
+    return `${student.last_name}, ${student.first_name}${mInitial}`;
+  }
+  if (format === 'First Last') {
+    return `${student.first_name} ${student.last_name}`;
+  }
+  return `${student.first_name}${mInitial} ${student.last_name}`;
 }
 
 // ------------------------------------------------------------------------------
@@ -232,10 +267,19 @@ async function processStudentVerification({ studentIdInput, discordUser, guild, 
   }
 
   // 5. Assign Server Roles & Manage Role Hierarchy
+  // 5. Assign Server Roles & Manage Role Hierarchy (Dynamically Configured)
+  const settings = await getGuildSettings();
   const assignedRoleNames = [];
   if (guild && member) {
     try {
-      const primaryRoleCandidates = ['ka-CpE', 'ICpEP.SE Verified Member', 'Verified Member', 'Verified'];
+      const primaryRoleCandidates = [
+        settings.verified_role_name,
+        'ka-CpE',
+        'ICpEP.SE Verified Member',
+        'Verified Member',
+        'Verified',
+      ].filter(Boolean);
+
       for (const candidate of primaryRoleCandidates) {
         const role = guild.roles.cache.find(r => r.name.toLowerCase() === candidate.toLowerCase());
         if (role) {
@@ -268,8 +312,9 @@ async function processStudentVerification({ studentIdInput, discordUser, guild, 
         }
       }
 
-      // Remove Unverified role
-      const unverifiedRole = guild.roles.cache.find(r => r.name.toLowerCase() === 'unverified');
+      // Remove Unverified role dynamically
+      const unverifiedRoleName = (settings.unverified_role_name || 'Unverified').toLowerCase();
+      const unverifiedRole = guild.roles.cache.find(r => r.name.toLowerCase() === unverifiedRoleName);
       if (unverifiedRole && member.roles.cache.has(unverifiedRole.id)) {
         await member.roles.remove(unverifiedRole).catch(err => {
           console.warn(`[Role Removal Warn] Could not remove Unverified role: ${err.message}`);
@@ -277,7 +322,7 @@ async function processStudentVerification({ studentIdInput, discordUser, guild, 
       }
 
       // 6. Safe Nickname Update
-      const desiredNickname = formatStudentDisplayName(student);
+      const desiredNickname = formatStudentDisplayName(student, settings.nickname_format);
       if (desiredNickname && desiredNickname.length <= 32) {
         await member.setNickname(desiredNickname).catch(err => {
           console.log(`[Nickname Sync] Skipped nickname for ${discordUser.username} (${err.message})`);
@@ -288,7 +333,7 @@ async function processStudentVerification({ studentIdInput, discordUser, guild, 
     }
   }
 
-  const fullName = formatStudentDisplayName(student);
+  const fullName = formatStudentDisplayName(student, settings.nickname_format);
 
   return {
     success: true,
@@ -395,7 +440,12 @@ client.on('guildMemberAdd', async member => {
 // ------------------------------------------------------------------------------
 client.on('messageCreate', async message => {
   if (message.author.bot || !message.guild) return;
-  if (message.channel.name.toLowerCase() !== 'verify') return;
+
+  const settings = await getGuildSettings();
+  const targetChannelName = (settings.verify_channel_name || 'verify').toLowerCase();
+  if (message.channel.name.toLowerCase() !== targetChannelName) return;
+
+  const autoDeleteMs = (settings.auto_delete_seconds || 6) * 1000;
 
   const now = Date.now();
   const lastAttempt = userCooldown.get(message.author.id) || 0;
@@ -421,14 +471,14 @@ client.on('messageCreate', async message => {
         .setColor(0xf43f5e)
         .setTitle(`❌ ${result.title}`)
         .setDescription(result.message)
-        .setFooter({ text: 'Auto-deleting in 6 seconds for privacy...' });
+        .setFooter({ text: `Auto-deleting in ${settings.auto_delete_seconds || 6} seconds for privacy...` });
 
       const replyMsg = await message.reply({ embeds: [errorEmbed] });
 
       setTimeout(() => {
         replyMsg.delete().catch(() => {});
         message.delete().catch(() => {});
-      }, 6000);
+      }, autoDeleteMs);
       return;
     }
 
@@ -445,7 +495,7 @@ client.on('messageCreate', async message => {
           inline: false,
         }
       )
-      .setFooter({ text: 'Auto-deleting message in 6 seconds for privacy...' })
+      .setFooter({ text: `Auto-deleting message in ${settings.auto_delete_seconds || 6} seconds for privacy...` })
       .setTimestamp();
 
     const replyMsg = await message.reply({ embeds: [successEmbed] });
@@ -453,14 +503,14 @@ client.on('messageCreate', async message => {
     setTimeout(() => {
       replyMsg.delete().catch(() => {});
       message.delete().catch(() => {});
-    }, 6000);
+    }, autoDeleteMs);
   } catch (err) {
     console.error('Error during messageCreate verification:', err);
     const failMsg = await message.reply('⚠️ Verification system encountered an error. Please try again later.');
     setTimeout(() => {
       failMsg.delete().catch(() => {});
       message.delete().catch(() => {});
-    }, 6000);
+    }, autoDeleteMs);
   }
 });
 

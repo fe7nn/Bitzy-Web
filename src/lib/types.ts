@@ -79,3 +79,14 @@ export interface BotStatusInfo {
   timestamp?: string;
 }
 
+export interface GuildSettings {
+  guild_id: string;
+  guild_name: string;
+  verified_role_name: string;
+  unverified_role_name: string;
+  verify_channel_name: string;
+  nickname_format: string;
+  auto_delete_seconds: number;
+  updated_at?: string;
+}
+
