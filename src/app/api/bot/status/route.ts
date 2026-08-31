@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
     customUrl ||
     process.env.DISCORD_BOT_URL ||
     process.env.NEXT_PUBLIC_DISCORD_BOT_URL ||
-    'http://127.0.0.1:3000';
+    'https://bitzy-discord-bot.onrender.com';
 
   const startTime = Date.now();
 
