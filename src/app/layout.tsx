@@ -6,7 +6,12 @@ export const metadata: Metadata = {
   title: 'ICpEP.SE Discord Community Verification System | Bitzy',
   description: 'Official student automated verification gateway & admin masterlist for ICpEP.SE (Institute of Computer Engineers of the Philippines - Student Edition)',
   icons: {
-    icon: '/favicon.ico',
+    icon: [
+      { url: '/favicon.ico' },
+      { url: '/icon.png', type: 'image/png' },
+    ],
+    shortcut: '/icon.png',
+    apple: '/icon.png',
   },
 };
 
