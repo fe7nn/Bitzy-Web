@@ -166,9 +166,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       </section>
 
       {/* Footer */}
-      <footer className="bottom-0 w-full py-8 px-8 border-t border-slate-800/80 bg-[#070b14] text-center text-xs text-slate-500">
+      <footer className="bottom-0 w-full py-8 px-8 border-t border-slate-800/80 bg-[#070b14] text-center text-xs text-slate-500 space-y-2">
         <p>© 2026 Institute of Computer Engineers of the Philippines - Student Edition (ICpEP.SE).</p>
-        <p className="mt-1 text-[11px]">Bitzy Verification Engine</p>
+        <div className="flex items-center justify-center gap-4 text-[11px] text-slate-400">
+          <a href="/terms" className="hover:text-blue-400 underline transition">Terms of Service</a>
+          <span>•</span>
+          <a href="/privacy" className="hover:text-blue-400 underline transition">Privacy Policy</a>
+        </div>
       </footer>
     </div>
   );
