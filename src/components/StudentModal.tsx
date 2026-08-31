@@ -139,7 +139,7 @@ export const StudentModal: React.FC<StudentModalProps> = ({
               disabled={!!student}
               value={studentId}
               onChange={e => setStudentId(e.target.value)}
-              placeholder="e.g. 2024-00101"
+              placeholder="e.g. 12-3456-789"
               className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono disabled:opacity-60 disabled:cursor-not-allowed"
             />
           </div>

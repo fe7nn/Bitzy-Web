@@ -29,7 +29,7 @@ const commands = [
     .addStringOption(option =>
       option
         .setName('student_id')
-        .setDescription('Your official Student ID (e.g., 2024-00101)')
+        .setDescription('Your official Student ID (e.g., 12-3456-789)')
         .setRequired(true)
     ),
 

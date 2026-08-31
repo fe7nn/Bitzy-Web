@@ -84,7 +84,7 @@ const slashCommands = [
     .addStringOption(option =>
       option
         .setName('student_id')
-        .setDescription('Your official Student ID (e.g., 2024-00101)')
+        .setDescription('Your official Student ID (e.g., 12-3456-789)')
         .setRequired(true)
     ),
 
@@ -376,7 +376,7 @@ client.on('guildMemberAdd', async member => {
         .setDescription(
           `To gain full access to the community channels, please verify your student membership.\n\n` +
             `**Two ways to verify:**\n` +
-            `1️⃣ **Type your Student ID** directly in this channel (e.g. \`2024-00101\`).\n` +
+            `1️⃣ **Type your Student ID** directly in this channel (e.g. \`12-3456-789\`).\n` +
             `2️⃣ Use the slash command **/verify** anywhere.\n\n` +
             `*Your message will be automatically deleted for your privacy.*`
         )
@@ -479,7 +479,7 @@ client.on('interactionCreate', async interaction => {
         .setCustomId('input_student_id')
         .setLabel('Official Student ID Number')
         .setStyle(TextInputStyle.Short)
-        .setPlaceholder('e.g. 2024-00101')
+        .setPlaceholder('e.g. 12-3456-789')
         .setRequired(true)
         .setMinLength(4)
         .setMaxLength(30);

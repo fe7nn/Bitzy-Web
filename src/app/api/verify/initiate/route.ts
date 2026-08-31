@@ -104,7 +104,7 @@ export async function GET() {
     version: '1.0.0',
     endpoint: 'POST /api/verify/initiate',
     expected_payload: {
-      student_id: 'e.g. 2024-00101',
+      student_id: 'e.g. 12-3456-789',
       discord_id: 'e.g. 812938491029384756',
       discord_tag: 'e.g. juandelacruz#1234 (optional)',
     },

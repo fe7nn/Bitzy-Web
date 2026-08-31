@@ -16,7 +16,7 @@ export const BotSimulatorModal: React.FC<BotSimulatorModalProps> = ({
   onClose,
   onVerificationSuccess,
 }) => {
-  const [studentId, setStudentId] = useState('2024-00103');
+  const [studentId, setStudentId] = useState('21-1234-567');
   const [discordId, setDiscordId] = useState('892019283746501928');
   const [discordTag, setDiscordTag] = useState('alex_cpe#9999');
   const [isLoading, setIsLoading] = useState(false);
@@ -29,7 +29,7 @@ export const BotSimulatorModal: React.FC<BotSimulatorModalProps> = ({
     {
       type: 'bot',
       timestamp: 'Today at 8:30 PM',
-      content: '👋 Welcome to the **ICpEP.SE Discord Server**! Please verify your student identity by running `/verify [student_id]`. Example: `/verify 2024-00103`',
+      content: '👋 Welcome to the **ICpEP.SE Discord Server**! Please verify your student identity by running `/verify [student_id]`. Example: `/verify 12-3456-789`',
     }
   ]);
   const [copied, setCopied] = useState(false);
@@ -270,7 +270,7 @@ export const BotSimulatorModal: React.FC<BotSimulatorModalProps> = ({
                 type="text"
                 value={studentId}
                 onChange={e => setStudentId(e.target.value)}
-                placeholder="2024-00103"
+                placeholder="12-3456-789"
                 className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono"
               />
             </div>
@@ -306,22 +306,22 @@ export const BotSimulatorModal: React.FC<BotSimulatorModalProps> = ({
               <span className="text-[10px] text-slate-500 hidden sm:inline">Try samples:</span>
               <button
                 type="button"
-                onClick={() => { setStudentId('2024-00103'); setDiscordId('892019283746501928'); }}
-                className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition"
+                onClick={() => { setStudentId('21-1234-567'); setDiscordId('892019283746501928'); }}
+                className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition font-mono"
               >
-                2024-00103 (Unverified)
+                21-1234-567
               </button>
               <button
                 type="button"
-                onClick={() => { setStudentId('2024-00101'); setDiscordId('812938491029384756'); }}
-                className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition"
+                onClick={() => { setStudentId('22-9876-543'); setDiscordId('812938491029384756'); }}
+                className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition font-mono"
               >
-                2024-00101 (Already Verified)
+                22-9876-543
               </button>
               <button
                 type="button"
-                onClick={() => { setStudentId('9999-99999'); setDiscordId('123456789'); }}
-                className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition"
+                onClick={() => { setStudentId('99-9999-999'); setDiscordId('123456789'); }}
+                className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition font-mono"
               >
                 Invalid ID
               </button>
