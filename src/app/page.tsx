@@ -1,118 +1,28 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React from 'react';
 import { Navbar } from '@/components/Navbar';
 import { LandingPage } from '@/components/LandingPage';
 import { Dashboard } from '@/components/Dashboard';
 import { BotSimulatorModal } from '@/components/BotSimulatorModal';
-import { Student, SystemStats, AdminUser } from '@/lib/types';
-import { supabaseAuth } from '@/lib/supabaseAuthClient';
+import { useApp } from '@/context/AppContext';
+import { CheckCircle2, AlertCircle, Info } from 'lucide-react';
 
 export default function HomePage() {
-  const [currentView, setCurrentView] = useState<'landing' | 'admin'>('landing');
-  const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
-  const [students, setStudents] = useState<Student[]>([]);
-  const [stats, setStats] = useState<SystemStats | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isBotSimulatorOpen, setIsBotSimulatorOpen] = useState(false);
-  const [supabaseConnected, setSupabaseConnected] = useState(false);
-
-  // 1. Initialize admin session from Supabase (real, verifiable session)
-  useEffect(() => {
-    supabaseAuth.auth.getSession().then(({ data }) => {
-      const session = data.session;
-      if (session?.user) {
-        const user: AdminUser = {
-          email: session.user.email || '',
-          name: (session.user.email || '').split('@')[0].toUpperCase(),
-          role: 'Admin',
-          token: session.access_token,
-        };
-        setAdminUser(user);
-        localStorage.setItem('bitzy_admin_user', JSON.stringify(user));
-      }
-    });
-
-    // Keep the token fresh / clear state on sign-out from elsewhere (e.g. expiry)
-    const { data: listener } = supabaseAuth.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        const user: AdminUser = {
-          email: session.user.email || '',
-          name: (session.user.email || '').split('@')[0].toUpperCase(),
-          role: 'Admin',
-          token: session.access_token,
-        };
-        setAdminUser(user);
-        localStorage.setItem('bitzy_admin_user', JSON.stringify(user));
-      } else {
-        setAdminUser(null);
-        localStorage.removeItem('bitzy_admin_user');
-      }
-    });
-
-    return () => listener.subscription.unsubscribe();
-  }, []);
-
-  // 2. Fetch students & stats (admin-only endpoints — send the access token)
-  const fetchData = useCallback(async () => {
-    if (!adminUser?.token) {
-      setIsLoading(false);
-      return;
-    }
-    setIsLoading(true);
-    try {
-      const authHeaders = { Authorization: `Bearer ${adminUser.token}` };
-      const [studentsRes, statsRes] = await Promise.all([
-        fetch('/api/students', { headers: authHeaders }),
-        fetch('/api/stats', { headers: authHeaders }),
-      ]);
-
-      if (studentsRes.ok) {
-        const studentsJson = await studentsRes.json();
-        if (studentsJson.data) setStudents(studentsJson.data);
-      }
-
-      if (statsRes.ok) {
-        const statsJson = await statsRes.json();
-        setStats(statsJson);
-      }
-    } catch (err) {
-      console.error('Failed to load data:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [adminUser?.token]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  // Admin login handler
-  const handleAdminLogin = (user: AdminUser) => {
-    setAdminUser(user);
-    try {
-      localStorage.setItem('bitzy_admin_user', JSON.stringify(user));
-    } catch {
-      // ignore
-    }
-    setCurrentView('admin');
-  };
-
-  // Admin logout handler
-  const handleAdminLogout = async () => {
-    try {
-      await supabaseAuth.auth.signOut();
-    } catch {
-      // ignore
-    }
-    setAdminUser(null);
-    try {
-      localStorage.removeItem('bitzy_admin_user');
-    } catch {
-      // ignore
-    }
-    setCurrentView('landing');
-  };
+  const {
+    adminUser,
+    currentView,
+    setCurrentView,
+    students,
+    stats,
+    isLoadingStudents,
+    refreshStudents,
+    login,
+    logout,
+    isSimulatorOpen,
+    setIsSimulatorOpen,
+    toast,
+  } = useApp();
 
   const handleOpenLoginModal = () => {
     setCurrentView('landing');
@@ -130,9 +40,8 @@ export default function HomePage() {
         setCurrentView={setCurrentView}
         adminUser={adminUser}
         onOpenLoginModal={handleOpenLoginModal}
-        onLogout={handleAdminLogout}
-        onOpenBotSimulator={() => setIsBotSimulatorOpen(true)}
-        supabaseConnected={supabaseConnected}
+        onLogout={logout}
+        onOpenBotSimulator={() => setIsSimulatorOpen(true)}
       />
 
       {/* Main View Container */}
@@ -141,38 +50,54 @@ export default function HomePage() {
           <LandingPage
             stats={stats}
             adminUser={adminUser}
-            onAdminLogin={handleAdminLogin}
-            onOpenBotSimulator={() => setIsBotSimulatorOpen(true)}
+            onAdminLogin={login}
+            onOpenBotSimulator={() => setIsSimulatorOpen(true)}
             onGoToDashboard={() => setCurrentView('admin')}
           />
+        ) : adminUser ? (
+          <Dashboard
+            students={students}
+            stats={stats}
+            isLoading={isLoadingStudents}
+            onRefreshData={refreshStudents}
+            adminUser={adminUser}
+            onOpenBotSimulator={() => setIsSimulatorOpen(true)}
+          />
         ) : (
-          adminUser ? (
-            <Dashboard
-              students={students}
-              stats={stats}
-              isLoading={isLoading}
-              onRefreshData={fetchData}
-              adminUser={adminUser}
-              onOpenBotSimulator={() => setIsBotSimulatorOpen(true)}
-            />
-          ) : (
-            <LandingPage
-              stats={stats}
-              adminUser={null}
-              onAdminLogin={handleAdminLogin}
-              onOpenBotSimulator={() => setIsBotSimulatorOpen(true)}
-              onGoToDashboard={() => setCurrentView('admin')}
-            />
-          )
+          <LandingPage
+            stats={stats}
+            adminUser={null}
+            onAdminLogin={login}
+            onOpenBotSimulator={() => setIsSimulatorOpen(true)}
+            onGoToDashboard={() => setCurrentView('admin')}
+          />
         )}
       </div>
 
       {/* Discord Bot Simulator Modal */}
       <BotSimulatorModal
-        isOpen={isBotSimulatorOpen}
-        onClose={() => setIsBotSimulatorOpen(false)}
-        onVerificationSuccess={fetchData}
+        isOpen={isSimulatorOpen}
+        onClose={() => setIsSimulatorOpen(false)}
+        onVerificationSuccess={refreshStudents}
       />
+
+      {/* Global Toast Notification System */}
+      {toast && (
+        <div
+          className={`fixed bottom-6 right-6 z-[100] flex items-center gap-2.5 px-4 py-3 rounded-xl border shadow-2xl text-xs font-semibold animate-in fade-in slide-in-from-bottom-2 duration-200 ${
+            toast.type === 'success'
+              ? 'bg-emerald-950/95 border-emerald-500/40 text-emerald-300'
+              : toast.type === 'error'
+              ? 'bg-rose-950/95 border-rose-500/40 text-rose-300'
+              : 'bg-blue-950/95 border-blue-500/40 text-blue-300'
+          }`}
+        >
+          {toast.type === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />}
+          {toast.type === 'error' && <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />}
+          {toast.type === 'info' && <Info className="w-4 h-4 text-blue-400 shrink-0" />}
+          <span>{toast.message}</span>
+        </div>
+      )}
     </main>
   );
 }
