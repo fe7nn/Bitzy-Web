@@ -63,3 +63,19 @@ export interface AdminUser {
   avatarUrl?: string;
   token?: string;
 }
+
+export interface BotStatusInfo {
+  online: boolean;
+  status: 'online' | 'offline' | 'unhealthy' | 'initializing';
+  botUser?: string | null;
+  botId?: string | null;
+  isReady?: boolean;
+  guilds?: number;
+  ping?: number;
+  uptimeSeconds?: number;
+  latencyMs?: number;
+  botUrl?: string;
+  error?: string;
+  timestamp?: string;
+}
+

@@ -5,6 +5,8 @@ import { LogOut } from 'lucide-react';
 import { AdminUser } from '@/lib/types';
 import logo from './icpep-logo.png';
 
+import { BotStatusBadge } from './BotStatusBadge';
+
 interface NavbarProps {
   currentView: 'landing' | 'admin';
   setCurrentView: (view: 'landing' | 'admin') => void;
@@ -49,6 +51,9 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Right Navigation & Controls */}
         <div className="flex items-center gap-3">
+          {/* Live Bot Status Badge */}
+          <BotStatusBadge />
+
           {/* View Toggle / Admin Actions */}
           {adminUser ? (
             <div className="flex items-center gap-2">

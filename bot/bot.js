@@ -440,23 +440,43 @@ client.on('interactionCreate', async interaction => {
 });
 
 // ------------------------------------------------------------------------------
-// 7. Express Health Check Gateway (Prevents Render / Uptime sleeping)
+// 7. Express Health Check Gateway (Prevents Render / Uptime sleeping & powers Web Status)
 // ------------------------------------------------------------------------------
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Enable CORS for web status checks
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  next();
+});
+
 app.get('/', (req, res) => {
+  const isReady = client.isReady();
   res.json({
-    status: 'online',
+    status: isReady ? 'online' : 'initializing',
     service: 'Bitzy Discord Bot Service',
-    botUser: client.user ? client.user.tag : 'Initializing...',
+    botUser: client.user ? client.user.tag : null,
+    botId: client.user ? client.user.id : null,
+    isReady,
+    guilds: client.guilds ? client.guilds.cache.size : 0,
+    ping: client.ws ? client.ws.ping : -1,
     uptimeSeconds: Math.floor(process.uptime()),
     timestamp: new Date().toISOString(),
   });
 });
 
 app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'healthy', ready: client.isReady() });
+  const isReady = client.isReady();
+  res.status(isReady ? 200 : 503).json({
+    status: isReady ? 'healthy' : 'unhealthy',
+    ready: isReady,
+    botUser: client.user ? client.user.tag : null,
+    guilds: client.guilds ? client.guilds.cache.size : 0,
+    ping: client.ws ? client.ws.ping : -1,
+    uptimeSeconds: Math.floor(process.uptime()),
+  });
 });
 
 app.listen(PORT, () => {
