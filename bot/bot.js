@@ -714,11 +714,33 @@ app.listen(PORT, () => {
 });
 
 // ------------------------------------------------------------------------------
-// 8. Connect to Discord Gateway
+// 8. Automated Keep-Alive Ping (Prevents Render Free Tier from spinning down)
+// ------------------------------------------------------------------------------
+const RENDER_APP_URL = process.env.RENDER_EXTERNAL_URL || 'https://bitzy-discord-bot.onrender.com';
+const PING_INTERVAL_MS = 10 * 60 * 1000; // Ping every 10 minutes (before Render's 15m timeout)
+
+function startKeepAlivePing() {
+  console.log(`⏱️ [Keep-Alive] Automated pinger active for ${RENDER_APP_URL} (every 10m)`);
+  setInterval(async () => {
+    try {
+      const res = await fetch(`${RENDER_APP_URL}/health`, {
+        headers: { 'User-Agent': 'Bitzy-Internal-KeepAlive/1.0' },
+      });
+      console.log(`[Keep-Alive] Pinged ${RENDER_APP_URL}/health (Status: ${res.status}) at ${new Date().toISOString()}`);
+    } catch (err) {
+      console.warn(`[Keep-Alive Warn] Ping to ${RENDER_APP_URL} failed: ${err.message}`);
+    }
+  }, PING_INTERVAL_MS);
+}
+
+// ------------------------------------------------------------------------------
+// 9. Connect to Discord Gateway
 // ------------------------------------------------------------------------------
 const discordToken = process.env.DISCORD_TOKEN;
 if (discordToken) {
-  client.login(discordToken).catch(err => {
+  client.login(discordToken).then(() => {
+    startKeepAlivePing();
+  }).catch(err => {
     console.error('❌ Failed to login to Discord:', err.message);
   });
 } else {
